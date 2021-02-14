@@ -3462,10 +3462,15 @@ int thermodynamics_recombination_with_recfast(
   double x_H0=0.;
   double z,mu_H,Lalpha,Lalpha_He,DeltaB,DeltaB_He;
   double zstart,zend,rhs;
-  int i,Nz;
+  int i, Nz=ppr->recfast_Nz0; // GFA: number of z integration steps
+  int j, Nzones = 3; // GFA: number of zones
+  double Nnow_b; // GFA: present number density of baryons
+  double X_e[Nz][Nzones]; // GFA: to store the free electron fraction at each z and zone
+  double T_b[Nz][Nzones], dT_b[Nz][Nzones]; // GFA: to store Tb and dTb/dz at each z and zone (I don't know if it is really necessary for temperature)
 
   /* introduced by JL for smoothing the various steps */
   double x0_previous,x0_new,s,weight;
+  double xe_mean; //GFA
 
   /* contains all quantities relevant for the integration algorithm */
   struct generic_integrator_workspace gi;
@@ -3484,8 +3489,6 @@ int thermodynamics_recombination_with_recfast(
 
   /** - read a few precision/cosmological parameters */
 
-  /* Nz */
-  Nz=ppr->recfast_Nz0;
 
   /* preco->H0 is H0 in inverse seconds (while pba->H0 is [H0/c] in inverse Mpcs) */
   preco->H0 = pba->H0 * _c_ / _Mpc_over_m_;
@@ -3523,8 +3526,6 @@ int thermodynamics_recombination_with_recfast(
   mu_H = 1./(1.-preco->YHe);
   //mu_T = _not4_ /(_not4_ - (_not4_-1.)*preco->YHe); /* recfast 1.4*/
   preco->fHe = preco->YHe/(_not4_ *(1.-preco->YHe)); /* recfast 1.4 */
-  preco->Nnow = 3.*preco->H0*preco->H0*OmegaB/(8.*_PI_*_G_*mu_H*_m_H_);
-  pth->n_e = preco->Nnow;
 
   /* energy injection parameters */
   preco->annihilation = pth->annihilation;
@@ -3575,235 +3576,535 @@ int thermodynamics_recombination_with_recfast(
   x0 = 1.+2.*preco->fHe;
   y[2] = preco->Tnow*(1.+z);
 
+
   /** - loop over redshift steps Nz; integrate over each step with
       generic_integrator(), store the results in the table using
       thermodynamics_derivs_with_recfast()*/
 
-  for(i=0; i <Nz; i++) {
 
-    zstart = zinitial * (double)(Nz-i) / (double)Nz;
-    zend   = zinitial * (double)(Nz-i-1) / (double)Nz;
+  if (pth->add_clumping == _FALSE_) {
 
-    z = zend;
+    Nnow_b = 3.*preco->H0*preco->H0*OmegaB/(8.*_PI_*_G_*_m_H_); // GFA: present number density of baryons
+    preco->Nnow = Nnow_b/mu_H; // GFA: present number density of Hydrogen (both neutral and ionized)
+    pth->n_e = preco->Nnow;
 
-    /** - --> first approximation: H and Helium fully ionized */
+    for(i=0; i <Nz; i++) {
 
-    if (z > ppr->recfast_z_He_1+ppr->recfast_delta_z_He_1) {
-      x_H0 = 1.;
-      x_He0 = 1.;
-      x0 = 1.+2.*preco->fHe;
-      y[0] = x_H0;
-      y[1] = x_He0;
-      y[2] = preco->Tnow*(1.+z);
-    }
+      zstart = zinitial * (double)(Nz-i) / (double)Nz;
+      zend   = zinitial * (double)(Nz-i-1) / (double)Nz;
 
-    /** - --> second approximation: first Helium recombination (analytic approximation) */
+      z = zend;
 
-    else if (z > ppr->recfast_z_He_2+ppr->recfast_delta_z_He_2) {
-      x_H0 = 1.;
-      x_He0 = 1.;
+      /** - --> first approximation: H and Helium fully ionized */
 
-      rhs = exp( 1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He2/(preco->Tnow*(1.+z)) ) / preco->Nnow;
-
-      /* smoothed transition */
-      if (z > ppr->recfast_z_He_1-ppr->recfast_delta_z_He_1) {
-        x0_previous = 1.+2.*preco->fHe;
-        x0_new = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
-
-        /* get s from -1 to 1 */
-        s = (ppr->recfast_z_He_1-z)/ppr->recfast_delta_z_He_1;
-        /* infer f1(s) = smooth function interpolating from 0 to 1 */
-        weight = f1(s);
-
-        x0 = weight*x0_new+(1.-weight)*x0_previous;
-      }
-      /* transition finished */
-      else {
-        x0 = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+      if (z > ppr->recfast_z_He_1+ppr->recfast_delta_z_He_1) {
+        x_H0 = 1.;
+        x_He0 = 1.;
+        x0 = 1.+2.*preco->fHe;
+        y[0] = x_H0;
+        y[1] = x_He0;
+        y[2] = preco->Tnow*(1.+z);
       }
 
-      y[0] = x_H0;
-      y[1] = x_He0;
-      y[2] = preco->Tnow*(1.+z);
-    }
+      /** - --> second approximation: first Helium recombination (analytic approximation) */
 
-    /** - --> third approximation: first Helium recombination completed */
+      else if (z > ppr->recfast_z_He_2+ppr->recfast_delta_z_He_2) {
+        x_H0 = 1.;
+        x_He0 = 1.;
 
-    else if (z > ppr->recfast_z_He_3+ppr->recfast_delta_z_He_3) {
-      x_H0 = 1.;
-      x_He0 = 1.;
-
-      /* smoothed transition */
-      if (z > ppr->recfast_z_He_2-ppr->recfast_delta_z_He_2) {
         rhs = exp( 1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He2/(preco->Tnow*(1.+z)) ) / preco->Nnow;
-        x0_previous = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
-        x0_new = 1. + preco->fHe;
-        /* get s from -1 to 1 */
-        s = (ppr->recfast_z_He_2-z)/ppr->recfast_delta_z_He_2;
-        /* infer f1(s) = smooth function interpolating from 0 to 1 */
-        weight = f1(s);
 
-        x0 = weight*x0_new+(1.-weight)*x0_previous;
+        /* smoothed transition */
+        if (z > ppr->recfast_z_He_1-ppr->recfast_delta_z_He_1) {
+          x0_previous = 1.+2.*preco->fHe;
+          x0_new = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
 
-      }
-      /* transition finished */
-      else {
-        x0 = 1.+preco->fHe;
-      }
+          /* get s from -1 to 1 */
+          s = (ppr->recfast_z_He_1-z)/ppr->recfast_delta_z_He_1;
+          /* infer f1(s) = smooth function interpolating from 0 to 1 */
+          weight = f1(s);
 
-      y[0] = x_H0;
-      y[1] = x_He0;
-      y[2] = preco->Tnow*(1.+z);
-    }
+          x0 = weight*x0_new+(1.-weight)*x0_previous;
+        }
+        /* transition finished */
+        else {
+          x0 = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+        }
 
-    /** - --> fourth approximation: second Helium recombination starts (analytic approximation) */
-
-    else if (y[1] > ppr->recfast_x_He0_trigger) {
-      x_H0 = 1.;
-
-      rhs = 4.*exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He1/(preco->Tnow*(1.+z)))/preco->Nnow;
-      x_He0 = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
-
-      /* smoothed transition */
-      if (z > ppr->recfast_z_He_3-ppr->recfast_delta_z_He_3) {
-        x0_previous = 1. + preco->fHe;
-        x0_new = x_He0;
-        /* get s from -1 to 1 */
-        s = (ppr->recfast_z_He_3-z)/ppr->recfast_delta_z_He_3;
-        /* infer f1(x) = smooth function interpolating from 0 to 1 */
-        weight = f1(s);
-
-        x0 = weight*x0_new+(1.-weight)*x0_previous;
-      }
-      /* transition finished */
-      else {
-        x0 = x_He0;
+        y[0] = x_H0;
+        y[1] = x_He0;
+        y[2] = preco->Tnow*(1.+z);
       }
 
-      x_He0 = (x0-1.)/preco->fHe;
-      y[0] = x_H0;
-      y[1] = x_He0;
-      y[2] = preco->Tnow*(1.+z);
-    }
+      /** - --> third approximation: first Helium recombination completed */
 
-    /** - --> fifth approximation: second Helium recombination (full
-        evolution for Helium), H recombination starts (analytic
-        approximation) */
+      else if (z > ppr->recfast_z_He_3+ppr->recfast_delta_z_He_3) {
+        x_H0 = 1.;
+        x_He0 = 1.;
 
-    else if (y[0] > ppr->recfast_x_H0_trigger) {
+        /* smoothed transition */
+        if (z > ppr->recfast_z_He_2-ppr->recfast_delta_z_He_2) {
+          rhs = exp( 1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He2/(preco->Tnow*(1.+z)) ) / preco->Nnow;
+          x0_previous = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+          x0_new = 1. + preco->fHe;
+          /* get s from -1 to 1 */
+          s = (ppr->recfast_z_He_2-z)/ppr->recfast_delta_z_He_2;
+          /* infer f1(s) = smooth function interpolating from 0 to 1 */
+          weight = f1(s);
 
-      rhs = exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1/(preco->Tnow*(1.+z)))/preco->Nnow;
-      x_H0 = 0.5*(sqrt(pow(rhs,2)+4.*rhs) - rhs);
+          x0 = weight*x0_new+(1.-weight)*x0_previous;
 
-      class_call(generic_integrator(thermodynamics_derivs_with_recfast,
-                                    zstart,
-                                    zend,
-                                    y,
-                                    &tpaw,
-                                    ppr->tol_thermo_integration,
-                                    ppr->smallest_allowed_variation,
-                                    &gi),
-                 gi.error_message,
-                 pth->error_message);
+        }
+        /* transition finished */
+        else {
+          x0 = 1.+preco->fHe;
+        }
 
-      y[0] = x_H0;
+        y[0] = x_H0;
+        y[1] = x_He0;
+        y[2] = preco->Tnow*(1.+z);
+      }
 
-      /* smoothed transition */
-      if (ppr->recfast_x_He0_trigger - y[1] < ppr->recfast_x_He0_trigger_delta) {
+      /** - --> fourth approximation: second Helium recombination starts (analytic approximation) */
+
+      else if (y[1] > ppr->recfast_x_He0_trigger) {
+        x_H0 = 1.;
+
         rhs = 4.*exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He1/(preco->Tnow*(1.+z)))/preco->Nnow;
-        x0_previous = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
-        x0_new = y[0] + preco->fHe*y[1];
-        /* get s from 0 to 1 */
-        s = (ppr->recfast_x_He0_trigger - y[1])/ppr->recfast_x_He0_trigger_delta;
-        /* infer f2(x) = smooth function interpolating from 0 to 1 */
-        weight = f2(s);
+        x_He0 = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
 
-        x0 = weight*x0_new+(1.-weight)*x0_previous;
+        /* smoothed transition */
+        if (z > ppr->recfast_z_He_3-ppr->recfast_delta_z_He_3) {
+          x0_previous = 1. + preco->fHe;
+          x0_new = x_He0;
+          /* get s from -1 to 1 */
+          s = (ppr->recfast_z_He_3-z)/ppr->recfast_delta_z_He_3;
+          /* infer f1(x) = smooth function interpolating from 0 to 1 */
+          weight = f1(s);
+
+          x0 = weight*x0_new+(1.-weight)*x0_previous;
+        }
+        /* transition finished */
+        else {
+          x0 = x_He0;
+        }
+
+        x_He0 = (x0-1.)/preco->fHe;
+        y[0] = x_H0;
+        y[1] = x_He0;
+        y[2] = preco->Tnow*(1.+z);
       }
-      /* transition finished */
-      else {
-        x0 = y[0] + preco->fHe*y[1];
-      }
 
-    }
+      /** - --> fifth approximation: second Helium recombination (full
+          evolution for Helium), H recombination starts (analytic
+          approximation) */
 
-    /** - --> last case: full evolution for H and Helium */
+      else if (y[0] > ppr->recfast_x_H0_trigger) {
 
-    else {
-
-      /* quantities used for smoothed transition */
-      if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
         rhs = exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1/(preco->Tnow*(1.+z)))/preco->Nnow;
         x_H0 = 0.5*(sqrt(pow(rhs,2)+4.*rhs) - rhs);
+
+        class_call(generic_integrator(thermodynamics_derivs_with_recfast,
+                                      zstart,
+                                      zend,
+                                      y,
+                                      &tpaw,
+                                      ppr->tol_thermo_integration,
+                                      ppr->smallest_allowed_variation,
+                                      &gi),
+                   gi.error_message,
+                   pth->error_message);
+
+        y[0] = x_H0;
+
+        /* smoothed transition */
+        if (ppr->recfast_x_He0_trigger - y[1] < ppr->recfast_x_He0_trigger_delta) {
+          rhs = 4.*exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He1/(preco->Tnow*(1.+z)))/preco->Nnow;
+          x0_previous = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
+          x0_new = y[0] + preco->fHe*y[1];
+          /* get s from 0 to 1 */
+          s = (ppr->recfast_x_He0_trigger - y[1])/ppr->recfast_x_He0_trigger_delta;
+          /* infer f2(x) = smooth function interpolating from 0 to 1 */
+          weight = f2(s);
+
+          x0 = weight*x0_new+(1.-weight)*x0_previous;
+        }
+        /* transition finished */
+        else {
+          x0 = y[0] + preco->fHe*y[1];
+        }
+
       }
 
-      class_call(generic_integrator(thermodynamics_derivs_with_recfast,
-                                    zstart,
-                                    zend,
-                                    y,
-                                    &tpaw,
-                                    ppr->tol_thermo_integration,
-                                    ppr->smallest_allowed_variation,
-                                    &gi),
-                 gi.error_message,
+      /** - --> last case: full evolution for H and Helium */
+
+      else {
+
+        /* quantities used for smoothed transition */
+        if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
+          rhs = exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1/(preco->Tnow*(1.+z)))/preco->Nnow;
+          x_H0 = 0.5*(sqrt(pow(rhs,2)+4.*rhs) - rhs);
+        }
+
+        class_call(generic_integrator(thermodynamics_derivs_with_recfast,
+                                      zstart,
+                                      zend,
+                                      y,
+                                      &tpaw,
+                                      ppr->tol_thermo_integration,
+                                      ppr->smallest_allowed_variation,
+                                      &gi),
+                   gi.error_message,
+                   pth->error_message);
+
+        /* smoothed transition */
+        if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
+          /* get s from 0 to 1 */
+          s = (ppr->recfast_x_H0_trigger - y[0])/ppr->recfast_x_H0_trigger_delta;
+          /* infer f2(s) = smooth function interpolating from 0 to 1 */
+          weight = f2(s);
+
+          x0 = weight*y[0]+(1.-weight)*x_H0 + preco->fHe*y[1];
+
+        }
+        /* transition finished */
+        else {
+          x0 = y[0] + preco->fHe*y[1];
+        }
+      }
+
+      /** - --> store the results in the table */
+      /* results are obtained in order of decreasing z, and stored in order of growing z */
+
+      /* redshift */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_z)=zend;
+
+      /* ionization fraction */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)=x0;
+
+      /* Tb */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb)=y[2];
+
+      /* get dTb/dz=dy[2] */
+      class_call(thermodynamics_derivs_with_recfast(zend, y, dy, &tpaw,pth->error_message),
+                 pth->error_message,
                  pth->error_message);
 
-      /* smoothed transition */
-      if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
-        /* get s from 0 to 1 */
-        s = (ppr->recfast_x_H0_trigger - y[0])/ppr->recfast_x_H0_trigger_delta;
-        /* infer f2(s) = smooth function interpolating from 0 to 1 */
-        weight = f2(s);
+      /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)
+        = _k_B_ / ( _c_ * _c_ * _m_H_ ) * (1. + (1./_not4_ - 1.) * preco->YHe + x0 * (1.-preco->YHe)) * y[2];
 
-        x0 = weight*y[0]+(1.-weight)*x_H0 + preco->fHe*y[1];
+      /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2)
+        = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)
+        * (1. + (1.+zend) * dy[2] / y[2] / 3.);
 
-      }
-      /* transition finished */
-      else {
-        x0 = y[0] + preco->fHe*y[1];
-      }
+      /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau)
+        = (1.+zend) * (1.+zend) * preco->Nnow * x0 * _sigma_ * _Mpc_over_m_;
+
+      /* fprintf(stdout,"%e %e %e %e %e %e\n", */
+      /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_z), */
+      /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe), */
+      /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb), */
+      /* 	    (1.+zend) * dy[2], */
+      /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2), */
+      /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau) */
+      /* 	    ); */
+
     }
 
-    /** - --> store the results in the table */
-    /* results are obtained in order of decreasing z, and stored in order of growing z */
+  } else { // GFA: consider baryon clumping
 
-    /* redshift */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_z)=zend;
 
-    /* ionization fraction */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)=x0;
+    for (j=0; j < Nzones; j++) {
 
-    /* Tb */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb)=y[2];
+      Nnow_b = 3.*preco->H0*preco->H0*OmegaB/(8.*_PI_*_G_*_m_H_); // GFA: present number density of baryons
 
-    /* get dTb/dz=dy[2] */
-    class_call(thermodynamics_derivs_with_recfast(zend, y, dy, &tpaw,pth->error_message),
-               pth->error_message,
-               pth->error_message);
+      if (j == 0) {
+        Nnow_b = Nnow_b*pth->Delta_1;
+      } else if (j ==1) {
+        Nnow_b = Nnow_b*pth->Delta_2;
+      } else {
+        Nnow_b = Nnow_b*pth->Delta_3;
+      }
 
-    /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)
-      = _k_B_ / ( _c_ * _c_ * _m_H_ ) * (1. + (1./_not4_ - 1.) * preco->YHe + x0 * (1.-preco->YHe)) * y[2];
+      preco->Nnow = Nnow_b/mu_H; // GFA: present number density of Hydrogen (both neutral and ionized)
+      pth->n_e = preco->Nnow;
 
-    /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2)
-      = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)
-      * (1. + (1.+zend) * dy[2] / y[2] / 3.);
 
-    /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
-    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau)
-      = (1.+zend) * (1.+zend) * preco->Nnow * x0 * _sigma_ * _Mpc_over_m_;
+      for(i=0; i <Nz; i++) { // GFA: fill the matrices Xe(i,j), Tb(i,j), dTb_dz(i,j)
 
-    /* fprintf(stdout,"%e %e %e %e %e %e\n", */
-    /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_z), */
-    /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe), */
-    /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb), */
-    /* 	    (1.+zend) * dy[2], */
-    /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2), */
-    /* 	    *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau) */
-    /* 	    ); */
+         zstart = zinitial * (double)(Nz-i) / (double)Nz;
+         zend   = zinitial * (double)(Nz-i-1) / (double)Nz;
 
-  }
+         z = zend;
+
+        /** - --> first approximation: H and Helium fully ionized */
+
+        if (z > ppr->recfast_z_He_1+ppr->recfast_delta_z_He_1) {
+           x_H0 = 1.;
+           x_He0 = 1.;
+           x0 = 1.+2.*preco->fHe;
+           y[0] = x_H0;
+           y[1] = x_He0;
+           y[2] = preco->Tnow*(1.+z);
+         }
+
+        /** - --> second approximation: first Helium recombination (analytic approximation) */
+
+        else if (z > ppr->recfast_z_He_2+ppr->recfast_delta_z_He_2) {
+           x_H0 = 1.;
+           x_He0 = 1.;
+
+           rhs = exp( 1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He2/(preco->Tnow*(1.+z)) ) / preco->Nnow;
+
+          /* smoothed transition */
+          if (z > ppr->recfast_z_He_1-ppr->recfast_delta_z_He_1) {
+            x0_previous = 1.+2.*preco->fHe;
+            x0_new = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+
+            /* get s from -1 to 1 */
+            s = (ppr->recfast_z_He_1-z)/ppr->recfast_delta_z_He_1;
+            /* infer f1(s) = smooth function interpolating from 0 to 1 */
+            weight = f1(s);
+
+            x0 = weight*x0_new+(1.-weight)*x0_previous;
+          }
+         /* transition finished */
+          else {
+            x0 = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+          }
+
+            y[0] = x_H0;
+            y[1] = x_He0;
+            y[2] = preco->Tnow*(1.+z);
+          }
+
+          /** - --> third approximation: first Helium recombination completed */
+
+          else if (z > ppr->recfast_z_He_3+ppr->recfast_delta_z_He_3) {
+              x_H0 = 1.;
+              x_He0 = 1.;
+
+              /* smoothed transition */
+              if (z > ppr->recfast_z_He_2-ppr->recfast_delta_z_He_2) {
+                  rhs = exp( 1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He2/(preco->Tnow*(1.+z)) ) / preco->Nnow;
+                  x0_previous = 0.5*(sqrt(pow((rhs-1.-preco->fHe),2) + 4.*(1.+2.*preco->fHe)*rhs) - (rhs-1.-preco->fHe));
+                  x0_new = 1. + preco->fHe;
+                  /* get s from -1 to 1 */
+                  s = (ppr->recfast_z_He_2-z)/ppr->recfast_delta_z_He_2;
+                  /* infer f1(s) = smooth function interpolating from 0 to 1 */
+                  weight = f1(s);
+
+                  x0 = weight*x0_new+(1.-weight)*x0_previous;
+
+              }
+              /* transition finished */
+             else {
+                  x0 = 1.+preco->fHe;
+                 }
+
+              y[0] = x_H0;
+              y[1] = x_He0;
+              y[2] = preco->Tnow*(1.+z);
+            }
+
+            /** - --> fourth approximation: second Helium recombination starts (analytic approximation) */
+
+            else if (y[1] > ppr->recfast_x_He0_trigger) {
+               x_H0 = 1.;
+
+               rhs = 4.*exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He1/(preco->Tnow*(1.+z)))/preco->Nnow;
+               x_He0 = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
+
+               /* smoothed transition */
+               if (z > ppr->recfast_z_He_3-ppr->recfast_delta_z_He_3) {
+                  x0_previous = 1. + preco->fHe;
+                  x0_new = x_He0;
+                  /* get s from -1 to 1 */
+                  s = (ppr->recfast_z_He_3-z)/ppr->recfast_delta_z_He_3;
+                 /* infer f1(x) = smooth function interpolating from 0 to 1 */
+                  weight = f1(s);
+
+                  x0 = weight*x0_new+(1.-weight)*x0_previous;
+              }
+              /* transition finished */
+              else {
+                 x0 = x_He0;
+              }
+
+              x_He0 = (x0-1.)/preco->fHe;
+              y[0] = x_H0;
+              y[1] = x_He0;
+              y[2] = preco->Tnow*(1.+z);
+            }
+
+            /** - --> fifth approximation: second Helium recombination (full
+            evolution for Helium), H recombination starts (analytic
+             approximation) */
+
+             else if (y[0] > ppr->recfast_x_H0_trigger) {
+
+                rhs = exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1/(preco->Tnow*(1.+z)))/preco->Nnow;
+                x_H0 = 0.5*(sqrt(pow(rhs,2)+4.*rhs) - rhs);
+
+                class_call(generic_integrator(thermodynamics_derivs_with_recfast,
+                                              zstart,
+                                              zend,
+                                              y,
+                                              &tpaw,
+                                              ppr->tol_thermo_integration,
+                                              ppr->smallest_allowed_variation,
+                                              &gi),
+                                    gi.error_message,
+                                    pth->error_message);
+
+                y[0] = x_H0;
+
+                /* smoothed transition */
+                if (ppr->recfast_x_He0_trigger - y[1] < ppr->recfast_x_He0_trigger_delta) {
+                    rhs = 4.*exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1_He1/(preco->Tnow*(1.+z)))/preco->Nnow;
+                    x0_previous = 0.5*(sqrt(pow((rhs-1.),2) + 4.*(1.+preco->fHe)*rhs )- (rhs-1.));
+                    x0_new = y[0] + preco->fHe*y[1];
+                    /* get s from 0 to 1 */
+                    s = (ppr->recfast_x_He0_trigger - y[1])/ppr->recfast_x_He0_trigger_delta;
+                    /* infer f2(x) = smooth function interpolating from 0 to 1 */
+                    weight = f2(s);
+
+                    x0 = weight*x0_new+(1.-weight)*x0_previous;
+                    }
+                   /* transition finished */
+                else {
+                    x0 = y[0] + preco->fHe*y[1];
+                     }
+
+               }
+
+              /** - --> last case: full evolution for H and Helium */
+
+             else {
+
+                /* quantities used for smoothed transition */
+                if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
+                    rhs = exp(1.5*log(preco->CR*preco->Tnow/(1.+z)) - preco->CB1/(preco->Tnow*(1.+z)))/preco->Nnow;
+                    x_H0 = 0.5*(sqrt(pow(rhs,2)+4.*rhs) - rhs);
+                 }
+
+                class_call(generic_integrator(thermodynamics_derivs_with_recfast,
+                                              zstart,
+                                              zend,
+                                              y,
+                                              &tpaw,
+                                              ppr->tol_thermo_integration,
+                                              ppr->smallest_allowed_variation,
+                                              &gi),
+                                 gi.error_message,
+                                 pth->error_message);
+
+                /* smoothed transition */
+                if (ppr->recfast_x_H0_trigger - y[0] < ppr->recfast_x_H0_trigger_delta) {
+                    /* get s from 0 to 1 */
+                    s = (ppr->recfast_x_H0_trigger - y[0])/ppr->recfast_x_H0_trigger_delta;
+                   /* infer f2(s) = smooth function interpolating from 0 to 1 */
+                    weight = f2(s);
+
+                    x0 = weight*y[0]+(1.-weight)*x_H0 + preco->fHe*y[1];
+
+                 }
+                /* transition finished */
+               else {
+                  x0 = y[0] + preco->fHe*y[1];
+                 }
+               }
+
+            X_e[i][j] = x0;
+            T_b[i][j] = y[2];
+            /* get dTb/dz=dy[2] */
+            class_call(thermodynamics_derivs_with_recfast(zend, y, dy, &tpaw,pth->error_message),
+                       pth->error_message,
+                       pth->error_message);
+            dT_b[i][j] = dy[2];
+
+
+
+         } // end of redshift loop for computing recombination
+
+    } //end of zone loop
+
+
+    // GFA: Here preco->Nnow and pth->n_e are updated to the homogeneous value --> correct?
+
+     Nnow_b = 3.*preco->H0*preco->H0*OmegaB/(8.*_PI_*_G_*_m_H_); // GFA: present number density of baryons
+     preco->Nnow = Nnow_b/mu_H; // GFA: present number density of Hydrogen (both neutral and ionized)
+     pth->n_e = preco->Nnow;
+
+
+
+    for(i=0; i <Nz; i++) { /** - --> GFA: store the results in the table (taking the correct average) */
+      /* results are obtained in order of decreasing z, and stored in order of growing z */
+
+      zstart = zinitial * (double)(Nz-i) / (double)Nz;
+      zend   = zinitial * (double)(Nz-i-1) / (double)Nz;
+
+      z = zend;
+
+      /* redshift */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_z)=zend;
+
+      /* ionization fraction */
+      xe_mean = pth->Delta_1*pth->fV_1*X_e[i][0]+ pth->Delta_2*pth->fV_2*X_e[i][1]+ pth->Delta_3*pth->fV_3*X_e[i][2];
+
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)= xe_mean;
+
+     // GFA: not sure if average is necessary for temperature and the rest of quantities below
+      /* Tb  */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
+
+       /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
+      _k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + xe_mean* (1.-preco->YHe)) * T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
+
+      /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2) =
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.); //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
+
+      /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
+      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau) =
+       (1.+zend) * (1.+zend) * xe_mean* preco->Nnow  * _sigma_ * _Mpc_over_m_; //assuming Nnow in the homogeneous case, i.e. pth->Delta_2 = 1
+
+
+        /* Tb  */
+//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = pth->Delta_1*pth->fV_1*T_b[i][0]
+//                                                                               + pth->Delta_2*pth->fV_2*T_b[i][1]
+//                                                                               + pth->Delta_3*pth->fV_3*T_b[i][2];
+
+         /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
+//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
+//        pth->Delta_1*pth->fV_1*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][0]* (1.-preco->YHe)) * T_b[i][0]
+//      + pth->Delta_2*pth->fV_2*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][1]* (1.-preco->YHe)) * T_b[i][1]
+//      + pth->Delta_3*pth->fV_3*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][2]* (1.-preco->YHe)) * T_b[i][2];
+
+       /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
+//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2)
+//        = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_1*pth->fV_1*(1. + (1.+zend) * dT_b[i][0] / T_b[i][0] / 3.)
+//        + *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_2*pth->fV_2*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.)
+//        + *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_3*pth->fV_3*(1. + (1.+zend) * dT_b[i][2] / T_b[i][2] / 3.);
+
+      /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
+//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau)
+//        = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)*(1.+zend) * (1.+zend) * preco->Nnow  * _sigma_ * _Mpc_over_m_;
+
+    // GFA: just for checking
+//       printf("Xe_1 = %e , Xe_2 (homo) = %e , Xe_3 = %e, Xe_mean= %e \n",X_e[i][0],X_e[i][1],X_e[i][2],xe_mean);
+//       printf("Tb_1 = %e , Tb_2 (homo) = %e , Tb_3 = %e, Tb_mean= %e \n",T_b[i][0],T_b[i][1],T_b[i][2],*(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) );
+
+
+    } // enf of redshift loop for filling the table
+
+  } // enf of if asking about baryon clumping
+
+
 
   /** - cleanup generic integrator with cleanup_generic_integrator() */
 

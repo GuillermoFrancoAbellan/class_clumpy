@@ -156,6 +156,16 @@ struct thermo
   double nindex_idm_dr; /**< temperature dependence of the interaction between dark matter and dark radiation */
   double m_idm;         /**< interacting dark matter mass */
 
+
+  short add_clumping; /**< GFA: Do we want to add baryon clumping at small scales? */
+  double b_clump;    /**< GFA: clumping factor */
+  double fV_1;       /**< GFA: volume fraction in zone 1 */
+  double fV_2;       /**< GFA: volume fraction in zone 2 */
+  double fV_3;       /**< GFA: volume fraction in zone 3 */
+  double Delta_1;    /**< GFA: density parameter in zone 1 */
+  double Delta_2;    /**< GFA: density parameter in zone 2 */
+  double Delta_3;    /**< GFA: density parameter in zone 3 */
+
   //@}
 
   /** @name - all indices for the vector of thermodynamical (=th) quantities stored in table */

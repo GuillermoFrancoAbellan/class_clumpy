@@ -124,6 +124,13 @@ cdef extern from "class.h":
         double b_idr
         double nindex_idm_dr
         double m_idm
+        double b_clump
+        double fV_1
+        double fV_2
+        double fV_3
+        double Delta_1
+        double Delta_2
+        double Delta_3 
 
         int tt_size
 

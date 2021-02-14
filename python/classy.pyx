@@ -1736,6 +1736,12 @@ cdef class Class:
                 value = self.th.z_d
             elif name == 'tau_d':
                 value = self.th.tau_d
+            elif name == 'fV_1':
+                value = self.th.fV_1
+            elif name == 'fV_3':
+                value = self.th.fV_3
+            elif name == 'Delta_3':
+                value = self.th.Delta_3
             elif name == 'ds_d':
                 value = self.th.ds_d
             elif name == 'ds_d_h':

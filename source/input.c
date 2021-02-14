@@ -650,6 +650,8 @@ int input_read_parameters(
   double n_cor=0.;
   double c_cor=0.;
   double stat_f_idr = 7./8.;
+  double factor_clump, numer_1_clump, numer_2_clump; /* GFA */
+  double coeff_1_clump, coeff_2_clump, discrim_clump; /* GFA */
 
   double Omega_tot;
 
@@ -1604,6 +1606,55 @@ int input_read_parameters(
       }
     }
   }
+
+  /** - GFA: Ask if we want to add small-scale baryon inhomogeneities (i.e., primordial magnetic fields) */
+  class_call(parser_read_string(pfc,"add_clumping",&string1,&flag1,errmsg),errmsg,errmsg);
+
+  if (flag1 == _TRUE_){
+    if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+      pth->add_clumping = _TRUE_;
+    }
+    else {
+     pth->add_clumping  = _FALSE_;
+    }
+  }
+
+  /** -  GFA: If yes, read clumping factor and the 3 free parameters describing the 3-zone model */
+
+  if (pth->add_clumping == _TRUE_) {
+    class_test(pth->recombination == hyrec, errmsg," You selected Hyrec, but baryon clumping is only implemented in RECFAST\n");
+
+    class_read_double("b_clump",pth->b_clump);
+    class_read_double("fV_2",pth->fV_2);
+    class_read_double("Delta_1",pth->Delta_1);
+    class_read_double("Delta_2",pth->Delta_2);
+
+    /** - GFA: compute the three remaining unknown parameters (fV_1, fV_3 and Delta_3) from the constraint equations  */
+    factor_clump = 1.0 - pth->Delta_1 + pth->fV_2*(pth->Delta_1 - pth->Delta_2);
+    numer_1_clump = (1.0 - pth->fV_2)*pow(pth->Delta_1,2) + pth->fV_2*pow(pth->Delta_2,2) - (1.0 + pth->b_clump);
+    numer_2_clump = pth->Delta_1*(1.0 + pth->b_clump - pth->Delta_1 + pth->fV_2*pth->Delta_2*(pth->Delta_1 - pth->Delta_2));
+    coeff_1_clump = numer_1_clump/factor_clump;
+    coeff_2_clump = numer_2_clump/factor_clump;
+    discrim_clump = pow(coeff_1_clump,2) - 4.0*coeff_2_clump;
+    class_test(discrim_clump < 0, errmsg," The discriminant is %e, giving rise to a imaginary Delta_3\n",discrim_clump);
+    pth->Delta_3 = 0.5*(-coeff_1_clump + sqrt(discrim_clump));
+    class_test(pth->Delta_3 < 0, errmsg," The values chosen for Delta_1, Delta_2, fV_2 and b lead to a negative Delta_3 =%e\n",pth->Delta_3);
+    pth->fV_3 = factor_clump/(pth->Delta_3 - pth->Delta_1);
+    pth->fV_1 = 1.0 - pth->fV_3 - pth->fV_2;
+
+    class_read_int("thermodynamics_verbose",pth->thermodynamics_verbose);
+
+    // print all parameters
+    if (pth->thermodynamics_verbose > 1) {
+      printf("For clumping factor b = %e , we obtain: \n",pth->b_clump);
+      printf("fV_1 = %e with Delta_1 = %e \n",pth->fV_1,pth->Delta_1);
+      printf("fV_2 = %e with Delta_2 = %e \n",pth->fV_2,pth->Delta_2);
+      printf("fV_3 = %e with Delta_3 = %e \n",pth->fV_3,pth->Delta_3);
+    }
+
+  }
+
+
 
   /** (c) define which perturbations and sources should be computed, and down to which scale */
 
@@ -3259,6 +3310,16 @@ int input_default_params(
   pth->b_idr = 0.;
   pth->nindex_idm_dr = 4.;
   pth->m_idm = 1.e11;
+
+
+  pth->add_clumping = _FALSE_; /* GFA */
+  pth->b_clump = 0.5; /* GFA */
+  pth->fV_1 = 0.3205;
+  pth->fV_2 = 0.3333;
+  pth->fV_3 = 0.3462;
+  pth->Delta_1 = 0.1000;
+  pth->Delta_2 = 1.0000;
+  pth->Delta_3 = 1.8333;
 
   /** - perturbation structure */
 
