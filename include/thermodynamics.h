@@ -158,6 +158,7 @@ struct thermo
 
 
   short add_clumping; /**< GFA: Do we want to add baryon clumping at small scales? */
+  short average_Tb;   /**< GFA: Do we also want to average the baryon temperature over the different zones? */
   double b_clump;    /**< GFA: clumping factor */
   double fV_1;       /**< GFA: volume fraction in zone 1 */
   double fV_2;       /**< GFA: volume fraction in zone 2 */

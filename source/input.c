@@ -1619,7 +1619,19 @@ int input_read_parameters(
     }
   }
 
-  /** -  GFA: If yes, read clumping factor and the 3 free parameters describing the 3-zone model */
+  /** - GFA: Ask if we also want to average the baryon temperature (when considering clumping) */
+  class_call(parser_read_string(pfc,"average_Tb",&string1,&flag1,errmsg),errmsg,errmsg);
+
+  if (flag1 == _TRUE_){
+    if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+      pth->average_Tb = _TRUE_;
+    }
+    else {
+     pth->average_Tb  = _FALSE_;
+    }
+  }
+
+  /** -  GFA: If we asked for clumping, read clumping factor and the 3 free parameters describing the 3-zone model */
 
   if (pth->add_clumping == _TRUE_) {
     class_test(pth->recombination == hyrec, errmsg," You selected Hyrec, but baryon clumping is only implemented in RECFAST\n");
@@ -3313,6 +3325,7 @@ int input_default_params(
 
 
   pth->add_clumping = _FALSE_; /* GFA */
+  pth->average_Tb = _FALSE_; /* GFA */
   pth->b_clump = 0.5; /* GFA */
   pth->fV_1 = 0.3205;
   pth->fV_2 = 0.3333;

@@ -4039,8 +4039,6 @@ int thermodynamics_recombination_with_recfast(
      preco->Nnow = Nnow_b/mu_H; // GFA: present number density of Hydrogen (both neutral and ionized)
      pth->n_e = preco->Nnow;
 
-
-
     for(i=0; i <Nz; i++) { /** - --> GFA: store the results in the table (taking the correct average) */
       /* results are obtained in order of decreasing z, and stored in order of growing z */
 
@@ -4057,43 +4055,42 @@ int thermodynamics_recombination_with_recfast(
 
       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)= xe_mean;
 
-     // GFA: not sure if average is necessary for temperature and the rest of quantities below
-      /* Tb  */
-      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
+     if (pth->average_Tb == _FALSE_) { // GFA: not sure if average is necessary for temperature and the rest of quantities below, thats why Im adding this flag
+       /* Tb  */
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
 
-       /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
-      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
-      _k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + xe_mean* (1.-preco->YHe)) * T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
-
-      /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
-      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2) =
-      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.); //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
-
-      /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
-      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau) =
-       (1.+zend) * (1.+zend) * xe_mean* preco->Nnow  * _sigma_ * _Mpc_over_m_; //assuming Nnow in the homogeneous case, i.e. pth->Delta_2 = 1
-
-
-        /* Tb  */
-//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = pth->Delta_1*pth->fV_1*T_b[i][0]
-//                                                                               + pth->Delta_2*pth->fV_2*T_b[i][1]
-//                                                                               + pth->Delta_3*pth->fV_3*T_b[i][2];
-
-         /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
-//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
-//        pth->Delta_1*pth->fV_1*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][0]* (1.-preco->YHe)) * T_b[i][0]
-//      + pth->Delta_2*pth->fV_2*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][1]* (1.-preco->YHe)) * T_b[i][1]
-//      + pth->Delta_3*pth->fV_3*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][2]* (1.-preco->YHe)) * T_b[i][2];
+        /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
+       _k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + xe_mean* (1.-preco->YHe)) * T_b[i][1]; //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
 
        /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
-//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2)
-//        = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_1*pth->fV_1*(1. + (1.+zend) * dT_b[i][0] / T_b[i][0] / 3.)
-//        + *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_2*pth->fV_2*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.)
-//        + *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*pth->Delta_3*pth->fV_3*(1. + (1.+zend) * dT_b[i][2] / T_b[i][2] / 3.);
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2) =
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb)*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.); //assuming temp. in the homogeneous case, i.e. pth->Delta_2 = 1
 
-      /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
-//      *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau)
-//        = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)*(1.+zend) * (1.+zend) * preco->Nnow  * _sigma_ * _Mpc_over_m_;
+       /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau) =
+        (1.+zend) * (1.+zend) * xe_mean* preco->Nnow  * _sigma_ * _Mpc_over_m_; //assuming Nnow in the homogeneous case, i.e. pth->Delta_2 = 1
+     } else {
+       /* Tb  */
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_Tb) = pth->Delta_1*pth->fV_1*T_b[i][0]
+                                                                                + pth->Delta_2*pth->fV_2*T_b[i][1]
+                                                                                + pth->Delta_3*pth->fV_3*T_b[i][2];
+        /* wb = (k_B/mu) Tb  = (k_B/mu) Tb */
+       *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_wb) =
+        pth->Delta_1*pth->fV_1*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][0]* (1.-preco->YHe)) * T_b[i][0]
+      + pth->Delta_2*pth->fV_2*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][1]* (1.-preco->YHe)) * T_b[i][1]
+      + pth->Delta_3*pth->fV_3*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][2]* (1.-preco->YHe)) * T_b[i][2];
+
+      /* cb2 = (k_B/mu) Tb (1-1/3 dlnTb/dlna) = (k_B/mu) Tb (1+1/3 (1+z) dlnTb/dz) */
+        *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_cb2)
+          = pth->Delta_1*pth->fV_1*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][0]* (1.-preco->YHe)) * T_b[i][0]*(1. + (1.+zend) * dT_b[i][0] / T_b[i][0] / 3.)
+          + pth->Delta_2*pth->fV_2*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][1]* (1.-preco->YHe)) * T_b[i][1]*(1. + (1.+zend) * dT_b[i][1] / T_b[i][1] / 3.)
+          + pth->Delta_3*pth->fV_3*_k_B_ / ( _c_ * _c_ * _m_H_ )*(1. + (1./_not4_ - 1.) * preco->YHe + X_e[i][2]* (1.-preco->YHe)) * T_b[i][2]*(1. + (1.+zend) * dT_b[i][2] / T_b[i][2] / 3.);
+
+     /* dkappa/dtau = a n_e x_e sigma_T = a^{-2} n_e(today) x_e sigma_T (in units of 1/Mpc) */
+        *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_dkappadtau)
+         = *(preco->recombination_table+(Nz-i-1)*preco->re_size+preco->index_re_xe)*(1.+zend) * (1.+zend) * preco->Nnow  * _sigma_ * _Mpc_over_m_; //assuming Nnow in the homogeneous case, i.e. pth->Delta_2 = 1
+     }
 
     // GFA: just for checking
 //       printf("Xe_1 = %e , Xe_2 (homo) = %e , Xe_3 = %e, Xe_mean= %e \n",X_e[i][0],X_e[i][1],X_e[i][2],xe_mean);
