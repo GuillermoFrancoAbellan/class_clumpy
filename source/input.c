@@ -1643,6 +1643,8 @@ int input_read_parameters(
 
     /** - GFA: compute the three remaining unknown parameters (fV_1, fV_3 and Delta_3) from the constraint equations  */
     factor_clump = 1.0 - pth->Delta_1 + pth->fV_2*(pth->Delta_1 - pth->Delta_2);
+    class_test(factor_clump == 0, errmsg," factor = 1 - Delta1 + fV2*(Delta1 - Delta2) is zero, giving rise to nans\n");
+    // NOTE: IT SEEMS THAT Delta_1 CANNOT BE BIGGER THAN 1, OTHERWISE IT LEADS TO HUGE fV3
     numer_1_clump = (1.0 - pth->fV_2)*pow(pth->Delta_1,2) + pth->fV_2*pow(pth->Delta_2,2) - (1.0 + pth->b_clump);
     numer_2_clump = pth->Delta_1*(1.0 + pth->b_clump - pth->Delta_1 + pth->fV_2*pth->Delta_2*(pth->Delta_1 - pth->Delta_2));
     coeff_1_clump = numer_1_clump/factor_clump;
