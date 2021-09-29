@@ -1585,6 +1585,33 @@ int input_read_parameters(
 
   class_read_double("decay",pth->decay);
 
+// GFA
+  class_call(parser_read_string(pfc,"has_UCMH_spike",&(string1),&(flag1),errmsg),errmsg,errmsg);
+  if (flag1 == _TRUE_) {
+    if ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)) {
+      pth->has_UCMH_spike = _TRUE_;
+    }
+    else {
+      if ((strstr(string1,"n") != NULL) || (strstr(string1,"N") != NULL)) {
+        pth->has_UCMH_spike = _FALSE_;
+      }
+      else {
+        class_stop(errmsg,"incomprehensible input '%s' for the field 'has_UCMH_spike'",string1);
+      }
+    }
+  }
+
+    if (pth->has_UCMH_spike == _TRUE_) {
+      class_read_double("A_spike",pth->A_spike);
+      class_read_double("k_spike",pth->k_spike);
+      class_read_double("m_WIMP",pth->m_WIMP);
+      class_read_double("sigmav_WIMP",pth->sigmav_WIMP);
+      class_read_double("f_2",pth->f_2);
+      class_read_double("Delta_c",pth->Delta_c);
+      class_read_double("Mass_min",pth->Mass_min);
+    }
+
+
   class_call(parser_read_string(pfc,
                                 "compute damping scale",
                                 &(string1),
@@ -2501,6 +2528,12 @@ int input_read_parameters(
                "inflationary module cannot work if you ask for isocurvature modes");
   }
 
+
+   if (pth->has_UCMH_spike == _TRUE_) { //GFA
+       pth->A_s = ppm->A_s;
+       pth->n_s = ppm->n_s;
+       pth->k_pivot = ppm->k_pivot;
+    }
   /** (e) parameters for final spectra */
 
   if (ppt->has_cls == _TRUE_) {
@@ -3316,6 +3349,16 @@ int input_default_params(
   pth->annihilation_z_halo = 30.;
   pth->has_on_the_spot = _TRUE_;
 
+  //GFA
+  pth->has_UCMH_spike = _FALSE_;
+  pth->A_spike = 1.e-10;
+  pth->k_spike =1.e3;
+  pth->m_WIMP = 1.;
+  pth->sigmav_WIMP =1.;
+  pth->f_2 = 30.;
+  pth->Delta_c = 200.;
+  pth->Mass_min = 1.0e-6;
+
   pth->compute_cb2_derivatives=_FALSE_;
 
   pth->compute_damping_scale = _FALSE_;
@@ -3410,6 +3453,9 @@ int input_default_params(
   ppm->k_pivot = 0.05;
   ppm->A_s = 2.215e-9;
   ppm->n_s = 0.9619;
+  pth->A_s = ppm->A_s; //GFA
+  pth->n_s = ppm->n_s;
+  pth->k_pivot = ppm->k_pivot;
   ppm->alpha_s = 0.;
   ppm->f_bi = 1.;
   ppm->n_bi = 1.;

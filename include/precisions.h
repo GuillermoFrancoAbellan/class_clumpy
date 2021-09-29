@@ -163,6 +163,17 @@ class_string_parameter(hyrec_Alpha_inf_file,"/hyrec/Alpha_inf.dat","Alpha_inf hy
 class_string_parameter(hyrec_R_inf_file,"/hyrec/R_inf.dat","R_inf hyrec file") /**< File containing the R_inf parameter of hyrec */
 class_string_parameter(hyrec_two_photon_tables_file,"/hyrec/two_photon_tables.dat","two_photon_tables hyrec file") /**< File containing the two-photon interaction parameter of hyrec */
 
+// GFA, relevant precision parameters for the calculation of the boost DM annihilation factor in the UCMH+NFW scenario
+class_precision_parameter(Mass_max,double,6.0e15) //in units of M_sol
+class_precision_parameter(k_min,double,1.0e-5) //in units of Mpc^{-1}
+class_precision_parameter(z_min,double,1.e-2)
+class_precision_parameter(z_max,double,2.e4)
+
+class_precision_parameter(Number_k,int,100)
+class_precision_parameter(Number_M,int,100)
+class_precision_parameter(Number_z,int,100)
+
+
 class_precision_parameter(k_min_tau0,double,0.1) /**< number defining k_min for the computation of Cl's and P(k)'s (dimensionless): (k_min tau_0), usually chosen much smaller than one */
 
 class_precision_parameter(k_max_tau0_over_l_max,double,2.4) /**< number defining k_max for the computation of Cl's (dimensionless): (k_max tau_0)/l_max, usually chosen around two */

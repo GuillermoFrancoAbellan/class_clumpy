@@ -20,6 +20,8 @@
 #include "helium.h"
 #include "hydrogen.h"
 #include "history.h"
+#include "arrays.h" //GFA
+
 
 /*************************************************************************************************
 Cosmological parameters Input/Output
@@ -384,6 +386,8 @@ double onthespot_injection_rate(REC_COSMOPARAMS *param,
   double rho_cdm_today;
   double u_min;
   double erfc;
+  double boost_at_z; //GFA
+  double boost_at_zz;
 
   /*redshift-dependent annihilation parameter*/
 
@@ -410,6 +414,19 @@ double onthespot_injection_rate(REC_COSMOPARAMS *param,
   u_min = (1+z)/(1+param->annihilation_z_halo);
 
   erfc = pow(1.+0.278393*u_min+0.230389*u_min*u_min+0.000972*u_min*u_min*u_min+0.078108*u_min*u_min*u_min*u_min,-4);
+
+  if (param->has_UCMH_spike == 1) {
+
+    if (z>1.e-2) {
+      array_interpolate_linear_simpler(param->z_table_for_boost,param->Number_z,param->boost_table,z,&boost_at_z);
+      boost_at_zz = boost_at_z;
+    } else {
+      boost_at_zz = param->boost_table[0];
+    }
+
+    printf("at z =%e, boost=%e\n",z, boost_at_zz);
+  }
+
 
   return (pow(rho_cdm_today,2)/2.99792458e8/2.99792458e8*pow((1.+z),3)*
     (pow((1.+z),3)*annihilation_at_z+param->annihilation_f_halo*erfc)
