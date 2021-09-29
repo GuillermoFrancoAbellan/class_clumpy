@@ -1805,6 +1805,7 @@ int thermodynamics_onthespot_energy_injection(
   double rho_cdm_today;
   double u_min;
   double erfc;
+  double boost_at_z; //GFA
 
   /*redshift-dependent annihilation parameter*/
 
@@ -1828,14 +1829,31 @@ int thermodynamics_onthespot_energy_injection(
 
   rho_cdm_today = pow(pba->H0*_c_/_Mpc_over_m_,2)*3/8./_PI_/_G_*(pba->Omega0_idm_dr+pba->Omega0_cdm)*_c_*_c_; /* energy density in J/m^3 */
 
-  u_min = (1+z)/(1+preco->annihilation_z_halo);
+  if (preco->has_UCMH_spike == _TRUE_) {
+    if (z>1.e-2) {
+      boost_at_z = array_interpolate_linear_simpler(preco->z_table_for_boost,ppr->Number_z,preco->boost_table,z);
+    } else {
+      boost_at_z = preco->boost_table[0];
+    }
 
-  erfc = pow(1.+0.278393*u_min+0.230389*u_min*u_min+0.000972*u_min*u_min*u_min+0.078108*u_min*u_min*u_min*u_min,-4);
+    *energy_rate = pow(rho_cdm_today,2)/_c_/_c_*pow((1+z),6)*annihilation_at_z*boost_at_z
+      +rho_cdm_today*pow((1+z),3)*preco->decay;
+    /* energy density rate in J/m^3/s (remember that annihilation_at_z is in m^3/s/Kg and decay in s^-1) */
 
-  *energy_rate = pow(rho_cdm_today,2)/_c_/_c_*pow((1+z),3)*
-    (pow((1.+z),3)*annihilation_at_z+preco->annihilation_f_halo*erfc)
-    +rho_cdm_today*pow((1+z),3)*preco->decay;
-  /* energy density rate in J/m^3/s (remember that annihilation_at_z is in m^3/s/Kg and decay in s^-1) */
+  } else {
+
+    u_min = (1+z)/(1+preco->annihilation_z_halo);
+    erfc = pow(1.+0.278393*u_min+0.230389*u_min*u_min+0.000972*u_min*u_min*u_min+0.078108*u_min*u_min*u_min*u_min,-4);
+
+    *energy_rate = pow(rho_cdm_today,2)/_c_/_c_*pow((1+z),3)*
+      (pow((1.+z),3)*annihilation_at_z+preco->annihilation_f_halo*erfc)
+      +rho_cdm_today*pow((1+z),3)*preco->decay;
+    /* energy density rate in J/m^3/s (remember that annihilation_at_z is in m^3/s/Kg and decay in s^-1) */
+
+
+  }
+
+
 
   return _SUCCESS_;
 
@@ -3198,7 +3216,7 @@ int thermodynamics_recombination_with_hyrec(
   param.annihilation_zmin = pth->annihilation_zmin;
   param.annihilation_f_halo = pth->annihilation_f_halo;
   param.annihilation_z_halo = pth->annihilation_z_halo;
-  //
+  // GFA
   param.has_UCMH_spike = pth->has_UCMH_spike;
   param.Number_z =ppr->Number_z;
   param.z_table_for_boost = pth->z_table_for_boost;
@@ -3320,6 +3338,9 @@ int thermodynamics_recombination_with_hyrec(
   preco->decay = pth->decay;
   preco->annihilation_f_halo = pth->annihilation_f_halo;
   preco->annihilation_z_halo = pth->annihilation_z_halo;
+  preco->has_UCMH_spike = pth->has_UCMH_spike;
+  preco->boost_table = pth->boost_table;
+  preco->z_table_for_boost = pth->z_table_for_boost;
   pth->n_e=preco->Nnow;
 
   /** - allocate memory for thermodynamics interpolation tables (size known in advance) and fill it */
@@ -3561,6 +3582,10 @@ int thermodynamics_recombination_with_recfast(
   preco->decay = pth->decay;
   preco->annihilation_f_halo = pth->annihilation_f_halo;
   preco->annihilation_z_halo = pth->annihilation_z_halo;
+  preco->has_UCMH_spike = pth->has_UCMH_spike;
+  preco->boost_table = pth->boost_table;
+  preco->z_table_for_boost = pth->z_table_for_boost;
+
 
   /* quantities related to constants defined in thermodynamics.h */
   //n = preco->Nnow * pow((1.+z),3);
@@ -4679,6 +4704,11 @@ int compute_boost_NFW_UCMH(
  rho_m_0 = pba->Omega0_m*2.775e11*pow(pba->h,2);  /* present matter density in units of M_sol/Mpc^3 */
  Mass_thres = 6.*pow(_PI_,2)*pow(pth->k_spike,-3)*rho_m_0;
 
+ if (pth->thermodynamics_verbose > 0) {
+   printf("Computing boost factor for spiky primordial spectrum \n");
+ }
+
+
  class_test((Mass_thres < pth->Mass_min),
             pth->error_message,
             "Mass_thres =%e is smaller than Mass_min =%e, this should never happen",Mass_thres, pth->Mass_min);
@@ -4709,7 +4739,6 @@ int compute_boost_NFW_UCMH(
   boost_low_mass  *= (pth->Delta_c*rho_c_over_rho_m/3.);
   // add up the two contributions
   pth->boost_table[index_z] = 1.+boost_high_mass+boost_low_mass;
-  //  printf("z=%e, boost =%e\n",pth->z_table_for_boost[index_z],pth->boost_table[index_z]);
   // NOTE: this expression is still neglecting possible effects due to mergers
  }
 

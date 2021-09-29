@@ -1908,12 +1908,11 @@ int array_interpolate_linear(
 
 
 
-int array_interpolate_linear_simpler(
+double array_interpolate_linear_simpler(
 			     double * x_array,
 			     int n_lines,
 			     double * array,
-			     double x,
-			     double * result) {
+			     double x) {
 
   int inf,sup,mid;
   double h,a,b;
@@ -1964,10 +1963,7 @@ int array_interpolate_linear_simpler(
   h = x_array[sup] - x_array[inf];
   b = (x-x_array[inf])/h;
   a = 1-b;
-
-  *(result) = a * *(array+inf) + b * *(array+sup);
-
-  return _SUCCESS_;
+  return a * *(array+inf) + b * *(array+sup);
 }
 
 

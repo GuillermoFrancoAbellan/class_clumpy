@@ -401,6 +401,10 @@ struct recombination {
 
   double annihilation_f_halo; /**< takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo; /**< characteristic redshift for DM annihilation in halos*/
+  // GFA
+  short has_UCMH_spike; /**< flag to specify if we want to consider a spike in the primordial spectrum, leading to the formation of  UCMHs**/
+  double * z_table_for_boost;
+  double * boost_table;
 
   //@}
 
