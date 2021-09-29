@@ -151,6 +151,22 @@ struct thermo
   double annihilation_f_halo; /**< takes the contribution of DM annihilation in halos into account*/
   double annihilation_z_halo; /**< characteristic redshift for DM annihilation in halos*/
 
+  /* GFA: relevant parameters for energy injection from UCMHs
+  Even if A_spike and k_spike enter in the expression for the primordial spectrum, it is better to
+  declare them here, since they only modify the CMB through the change in the thermodynamics history*/
+  short has_UCMH_spike; /**< flag to specify if we want to consider a spike in the primordial spectrum, leading to the formation of  UCMHs**/
+  double A_spike; //amplitude of the spike
+  double k_spike; //location of the spike
+  double m_WIMP;  // m is the WIMP mass in units of 100 GeV/c^2
+  double sigmav_WIMP; // sigmav is the velocity-averaged annihilation cross-section in units of the canonical WIMP value: 3x10^{-26} cm^3/s
+  double f_2;     // Given from a fit to N-body simulations by by Delos et al.
+  double Delta_c; //characteristic overdensity of halos at collapse
+  double Mass_min; //minimal halo mass in units of M_sol, dependent of the WIMP model
+
+  double A_s;
+  double n_s;
+  double k_pivot;
+
   double a_idm_dr;      /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
   double b_idr;         /**< strength of the self coupling for interacting dark radiation (idr-idr) */
   double nindex_idm_dr; /**< temperature dependence of the interaction between dark matter and dark radiation */
@@ -209,6 +225,9 @@ struct thermo
   int tt_size; /**< number of lines (redshift steps) in the tables */
   double * z_table; /**< vector z_table[index_z] with values of redshift (vector of size tt_size) */
   double * thermodynamics_table; /**< table thermodynamics_table[index_z*pth->tt_size+pba->index_th] with all other quantities (array of size th_size*tt_size) */
+  // GFA, variables required for computing the vectors Boost vs. z and storing them in a table
+  double * z_table_for_boost;
+  double * boost_table;
 
   //@}
 
@@ -490,6 +509,7 @@ struct thermodynamics_parameters_and_workspace {
 
 };
 
+
 /**************************************************************/
 /* @cond INCLUDE_WITH_DOXYGEN */
 /*
@@ -639,6 +659,78 @@ extern "C" {
                           double after,
                           double width,
                           double * result);
+
+  // GFA
+  struct halos_workspace {
+         struct precision  * ppr;
+         struct background * pba;
+         struct thermo     * pth;
+         double R; /* comoving scale */
+         double z; /* redshift */
+         double c3_over_mu;
+         double sigma2_st;
+   };
+
+  int compute_boost_NFW_UCMH(struct precision * ppr, //GFA
+                             struct background * pba,
+                             struct thermo * pth);
+
+  double T0_tilde(double k,
+                  double alpha,
+                  double beta,
+                  struct background * pba);
+
+  double G(double y);
+
+  double T_Hu(double k,
+              struct background * pba);
+
+  double integrand_for_sigma2(void * params,
+                              double k);
+
+  double integrand_boost_high_mass(void * params,
+                                   double M);
+  double f_NFW(double c);
+
+  double c_NFW(double M,
+               void * params);
+
+  double H_per_H0(double z,
+                   struct background * pba);
+
+  double zF_wo_spike(void * params,
+                     double M);
+
+  double halo_function_high_mass(void * params,
+                                  double M);
+
+  double D_growth(double z,
+                  struct background * pba);
+
+  double c_UCMH(double M,
+                void * params);
+
+  double g_UCMH(void * params,
+                double c);
+
+  double g_UCMH_prime(void * params,
+                      double c);
+
+  double zF_w_spike(void * params,
+                    double M);
+
+  double f_UCMH(double c,
+                double M,
+                void * params);
+
+  double tH0(double z,
+             struct background * pba);
+
+  double integrand_boost_low_mass(void * params,
+                                  double M);
+
+  double halo_function_low_mass(void * params,
+                                  double M);
 
 #ifdef __cplusplus
 }

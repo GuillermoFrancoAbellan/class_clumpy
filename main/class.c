@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     return _FAILURE_;
   }
 
-  if (thermodynamics_init(&pr,&ba,&th) == _FAILURE_) {
+  if (thermodynamics_init(&pr,&ba,&th) == _FAILURE_) { //GFA
     printf("\n\nError in thermodynamics_init \n=>%s\n",th.error_message);
     return _FAILURE_;
   }
