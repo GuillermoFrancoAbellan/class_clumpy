@@ -400,7 +400,13 @@ int thermodynamics_init(
               pth->error_message,
               "The presence of UCMHs from a spiky primordial spectrum requires setting 'annihilation_f_halo =0.', the latter parameter is just used when we consider a standard primordial spectrum");
 
-  // GFA: Should eventually add error messages to limit the values of A_spike and k_spike so that UCMHs always form during matter era
+  class_test((pth->has_UCMH_spike==_TRUE_) && (pth->recombination==recfast),
+              pth->error_message,
+              "Switching on DM annihilation in UCMHs requires using HyRec instead of RECFAST. Otherwise some values go beyond their range of validity in the RECFAST fits, and the thermodynamics module fails.");
+
+  class_test((pth->has_UCMH_spike==_TRUE_) && (pth->A_spike >1.0e-4),
+              pth->error_message,
+              "You selected a value of A_spike which is too big, in this case UCMHs might form during radiation era, meaning that our calculation of the boost is not valid anymore ");
 
   if (pth->thermodynamics_verbose > 0)
     if ((pth->annihilation >0) && (pth->reio_parametrization == reio_none) && (ppr->recfast_Heswitch >= 3) && (pth->recombination==recfast))
@@ -4602,6 +4608,9 @@ int thermodynamics_output_titles(struct background * pba,
     class_store_columntitle(titles,"dmu_idr",_TRUE_);
   }
 
+  class_store_columntitle(titles,"boost",pth->has_UCMH_spike); //GFA
+
+
   return _SUCCESS_;
 }
 
@@ -4614,6 +4623,7 @@ int thermodynamics_output_data(struct background * pba,
   int index_z, storeidx;
   double *dataptr, *pvecthermo;
   double z,tau;
+  double boost_at_z;
 
   //  pth->number_of_thermodynamics_titles = get_number_of_titles(pth->thermodynamics_titles);
   //pth->size_thermodynamics_data = pth->number_of_thermodynamics_titles*pth->tt_size;
@@ -4662,6 +4672,17 @@ int thermodynamics_output_data(struct background * pba,
       class_store_double(dataptr,pvecthermo[pth->index_th_Tidm_dr],_TRUE_,storeidx);
       class_store_double(dataptr,pvecthermo[pth->index_th_dmu_idr],_TRUE_,storeidx);
     }
+
+    if (pth->has_UCMH_spike == _TRUE_) { //GFA
+      if (z>1.e-2) {
+        boost_at_z = array_interpolate_linear_simpler(pth->z_table_for_boost,pth->Number_z,pth->boost_table,z); //check ppr->Number_z
+      } else {
+        boost_at_z = pth->boost_table[0];
+      }
+    class_store_double(dataptr,boost_at_z,_TRUE_,storeidx);
+    }
+
+
   }
 
   return _SUCCESS_;

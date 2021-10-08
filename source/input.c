@@ -1602,8 +1602,35 @@ int input_read_parameters(
   }
 
     if (pth->has_UCMH_spike == _TRUE_) {
-      class_read_double("A_spike",pth->A_spike);
-      class_read_double("k_spike",pth->k_spike);
+
+      class_call(parser_read_double(pfc,"A_spike",&param1,&flag1,errmsg),
+                 errmsg,
+                 errmsg);
+      class_call(parser_read_double(pfc,"Log10_A_spike",&param2,&flag2,errmsg),
+                 errmsg,
+                 errmsg);
+      class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
+                 errmsg,
+                 "In input file, you cannot enter both A_spike and Log10_A_spike, choose one");
+      if (flag1 == _TRUE_)
+        pth->A_spike = param1;
+      else if (flag2 == _TRUE_)
+        pth->A_spike = pow(10,param2);
+
+      class_call(parser_read_double(pfc,"k_spike",&param1,&flag1,errmsg),
+                 errmsg,
+                 errmsg);
+      class_call(parser_read_double(pfc,"Log10_k_spike",&param2,&flag2,errmsg),
+                 errmsg,
+                 errmsg);
+      class_test((flag1 == _TRUE_) && (flag2 == _TRUE_),
+                 errmsg,
+                 "In input file, you cannot enter both k_spike and Log10_k_spike, choose one");
+      if (flag1 == _TRUE_)
+        pth->k_spike = param1;
+      else if (flag2 == _TRUE_)
+        pth->k_spike = pow(10,param2);
+
       class_read_double("m_WIMP",pth->m_WIMP);
       class_read_double("sigmav_WIMP",pth->sigmav_WIMP);
       class_read_double("f_2",pth->f_2);
@@ -2533,6 +2560,7 @@ int input_read_parameters(
        pth->A_s = ppm->A_s;
        pth->n_s = ppm->n_s;
        pth->k_pivot = ppm->k_pivot;
+       pth->Number_z = ppr->Number_z;
     }
   /** (e) parameters for final spectra */
 

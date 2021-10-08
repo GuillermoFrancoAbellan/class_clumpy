@@ -166,6 +166,7 @@ struct thermo
   double A_s;
   double n_s;
   double k_pivot;
+  int Number_z;
 
   double a_idm_dr;      /**< strength of the coupling between interacting dark matter and interacting dark radiation (idm-idr) */
   double b_idr;         /**< strength of the self coupling for interacting dark radiation (idr-idr) */
