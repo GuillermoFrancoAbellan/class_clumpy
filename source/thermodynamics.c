@@ -481,6 +481,8 @@ int thermodynamics_init(
              pth->error_message,
              pth->error_message);
 
+
+
   /** - compute table of corresponding conformal times */
 
   class_alloc(tau_table,pth->tt_size*sizeof(double),pth->error_message);
@@ -1325,9 +1327,18 @@ int thermodynamics_free(
                         struct thermo * pth
                         ) {
 
+//  struct recombination * preco;
+//  REC_COSMOPARAMS * param;
+
   free(pth->z_table);
   free(pth->thermodynamics_table);
   free(pth->d2thermodynamics_dz2_table);
+  free(pth->z_table_for_boost);
+  free(pth->boost_table);
+//  free(preco->z_table_for_boost);
+//  free(preco->boost_table);
+//  free(param->z_table_for_boost);
+//  free(param->boost_table);
 
   return _SUCCESS_;
 }
@@ -3114,6 +3125,7 @@ int thermodynamics_reionization_sample(
 
   return _SUCCESS_;
 
+
 }
 
 /**
@@ -3144,6 +3156,7 @@ int thermodynamics_recombination(
                pth->error_message);
 
   }
+
 
   return _SUCCESS_;
 
@@ -3225,6 +3238,8 @@ int thermodynamics_recombination_with_hyrec(
   // GFA
   param.has_UCMH_spike = pth->has_UCMH_spike;
   param.Number_z =ppr->Number_z;
+//  class_alloc(param.z_table_for_boost,ppr->Number_z*sizeof(double),pth->error_message);
+//  class_alloc(param.boost_table,ppr->Number_z*sizeof(double),pth->error_message);
   param.z_table_for_boost = pth->z_table_for_boost;
   param.boost_table = pth->boost_table;
 
@@ -3345,6 +3360,8 @@ int thermodynamics_recombination_with_hyrec(
   preco->annihilation_f_halo = pth->annihilation_f_halo;
   preco->annihilation_z_halo = pth->annihilation_z_halo;
   preco->has_UCMH_spike = pth->has_UCMH_spike;
+//  class_alloc(preco->z_table_for_boost,ppr->Number_z*sizeof(double),pth->error_message);
+//  class_alloc(preco->boost_table,ppr->Number_z*sizeof(double),pth->error_message);
   preco->boost_table = pth->boost_table;
   preco->z_table_for_boost = pth->z_table_for_boost;
   pth->n_e=preco->Nnow;
@@ -3589,6 +3606,8 @@ int thermodynamics_recombination_with_recfast(
   preco->annihilation_f_halo = pth->annihilation_f_halo;
   preco->annihilation_z_halo = pth->annihilation_z_halo;
   preco->has_UCMH_spike = pth->has_UCMH_spike;
+  //  class_alloc(preco->z_table_for_boost,ppr->Number_z*sizeof(double),pth->error_message);
+  //  class_alloc(preco->boost_table,ppr->Number_z*sizeof(double),pth->error_message);
   preco->boost_table = pth->boost_table;
   preco->z_table_for_boost = pth->z_table_for_boost;
 
@@ -4738,11 +4757,15 @@ int compute_boost_NFW_UCMH(
  sigma2_standard = integrate_simpson(ppr->k_min, pth->k_spike ,ppr->Number_k, LOG, integrand_for_sigma2, &params);
  sigma2_tot = sigma2_spike + sigma2_standard;
 
- z_step=(log10(ppr->z_max)-log10(ppr->z_min))/(ppr->Number_z);
+ z_step=(log10(ppr->z_max)-log10(ppr->z_min))/(double)(ppr->Number_z);
 
  for (index_z=0; index_z <=ppr->Number_z; index_z++) {
-  z = ppr->z_min*pow(10,index_z*z_step);
+  z = ppr->z_min*pow(10.,(double)(index_z)*z_step);
+
+//  printf(" sizeof(z)= %ld\n",sizeof(z) );
+//  printf(" sizeof(z_table_for_boost[index_z])= %ld\n",sizeof(pth->z_table_for_boost[index_z]) );
   pth->z_table_for_boost[index_z] = z;
+
   params.z = z;
   rho_c_over_rho_m = 1. + pba->Omega0_lambda/(pba->Omega0_m*pow(1.+z,3.));
   //Compute high-mass contribution
@@ -4760,6 +4783,7 @@ int compute_boost_NFW_UCMH(
   boost_low_mass  *= (pth->Delta_c*rho_c_over_rho_m/3.);
   // add up the two contributions
   pth->boost_table[index_z] = 1.+boost_high_mass+boost_low_mass;
+
   // NOTE: this expression is still neglecting possible effects due to mergers
  }
 

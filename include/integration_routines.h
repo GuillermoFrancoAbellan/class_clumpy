@@ -49,5 +49,8 @@ for (i=1; i < N; i++) {
 
 integral = (h/3.)*(f[0]+4.*sum_odd+ 2.*sum_even+f[N]);
 
+free(x);
+free(f);
+
 return integral;
 }
